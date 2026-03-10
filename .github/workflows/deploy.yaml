@@ -2,6 +2,11 @@ name: deploy
 
 on:
   workflow_call:
+    inputs:
+        run-tests:
+            required: false
+            default: false
+            type: boolean
     secrets:
         AWS_ACCESS_KEY_ID:
           required: true
@@ -21,8 +26,21 @@ env:
   DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
 
 jobs:
+  tests:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run-tests == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Run tests
+        run: ./test.sh
+
   release:
     runs-on: ['aws', 'linux', 'self-hosted' ]
+    needs: tests
+    if: ${{ always() && (needs.tests.result == 'success' || needs.tests.result == 'skipped') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v2
