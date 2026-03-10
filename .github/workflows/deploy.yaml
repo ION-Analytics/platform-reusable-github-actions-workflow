@@ -1,0 +1,54 @@
+name: deploy
+
+on:
+  workflow_call:
+    secrets:
+        AWS_ACCESS_KEY_ID:
+          required: true
+        AWS_SECRET_ACCESS_KEY:
+          required: true
+        DATADOG_API_KEY:
+          required: true
+        DATADOG_APP_KEY:
+          required: true
+
+env:
+  JOB_NAME: ${{ github.workflow }}
+  VERSION: ${{ github.run_number }}-${{ github.sha }}
+
+jobs:
+  test-and-release:
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Release
+        run: cdflow2 release $VERSION
+
+  deploy-aslive:
+    runs-on: ubuntu-latest
+    needs: test-and-release
+    environment:
+      name: aslive
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Deploy to aslive
+        run: cdflow2 deploy aslive $VERSION
+
+  deploy-live:
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    needs: test-and-release
+    environment:
+      name: live
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Deploy to live
+        run: cdflow2 deploy live $VERSION
