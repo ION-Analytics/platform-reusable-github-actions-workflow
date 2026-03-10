@@ -15,6 +15,10 @@ on:
 env:
   JOB_NAME: ${{ github.workflow }}
   VERSION: ${{ github.run_number }}-${{ github.sha }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+  DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
 
 jobs:
   test-and-release:
@@ -42,7 +46,7 @@ jobs:
 
   deploy-live:
     runs-on: ['aws', 'linux', 'self-hosted' ]
-    needs: test-and-release
+    needs: deploy-aslive
     environment:
       name: live
     steps:
