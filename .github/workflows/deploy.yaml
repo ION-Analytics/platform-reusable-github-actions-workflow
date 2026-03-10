@@ -21,7 +21,7 @@ env:
   DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
 
 jobs:
-  test-and-release:
+  release:
     runs-on: ['aws', 'linux', 'self-hosted' ]
     steps:
       - name: Checkout
@@ -33,7 +33,7 @@ jobs:
 
   deploy-aslive:
     runs-on: ubuntu-latest
-    needs: test-and-release
+    needs: release
     environment:
       name: aslive
     steps:
