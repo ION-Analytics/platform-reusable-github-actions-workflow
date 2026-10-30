@@ -103,6 +103,10 @@ Approval rules configured on a GitHub environment apply to that env's deploy job
 
 Each IAM role needs a trust policy for the GitHub OIDC provider (`token.actions.githubusercontent.com`) with a `sub` condition matching the calling repo. If you scope `sub` to environments (`repo:org/repo:environment:aslive`), list every env that uses the role. The `release` job runs outside any environment, so its role needs a branch or ref condition instead.
 
+### Branch restriction
+
+The workflow only runs when called from the default branch of the calling repository. From any other ref (feature branches, pull requests, tags) the `check-branch` job fails and nothing else runs. GitHub cannot enforce this on the callee side, so it is a guard, not a security boundary: also set "Deployment branches" on each GitHub environment and restrict the IAM role trust policies to the default branch.
+
 ### Notes and limitations
 
 - All jobs run on the self-hosted runner (`aws`, `linux`, `self-hosted`). The runner needs `jq` for the `prepare` job.
