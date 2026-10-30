@@ -41,7 +41,7 @@ jobs:
     secrets:
       DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
       DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
-      RELEASE_ROLE_ARN: ${{ secrets.RELEASE_ROLE_ARN }}
+      AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
 ```
 
 ### Plan only
@@ -75,7 +75,7 @@ The release job still runs, because `cdflow2 deploy` needs a release version.
 |---|---|
 | `DATADOG_API_KEY` | yes |
 | `DATADOG_APP_KEY` | yes |
-| `RELEASE_ROLE_ARN` | yes |
+| `AWS_ROLE_ARN` | yes |
 
 ### Environment configuration
 

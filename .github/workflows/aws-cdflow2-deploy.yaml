@@ -7,7 +7,7 @@ name: aws-cdflow2-deploy
 #
 # Each name is both the GitHub environment and the cdflow2 env. Configure these
 # variables on every GitHub environment:
-#   AWS_ROLE_ARN  (required) IAM role assumed via OIDC
+#   AWS_ROLE_ARN  (required, unless the caller passes an AWS_ROLE_ARN secret) IAM role assumed via OIDC
 #   AWS_REGION    (optional) overrides the `aws-region` input
 #   CDFLOW2_DEPLOY_ARGS (optional) extra global flags placed before `deploy` in the cdflow2 command,
 #                 e.g. "--config-param region=eu-west-2"
@@ -38,8 +38,8 @@ on:
         required: true
       DATADOG_APP_KEY:
         required: true
-      RELEASE_ROLE_ARN:
-        description: IAM role ARN assumed via OIDC for the release job
+      AWS_ROLE_ARN:
+        description: IAM role ARN assumed via OIDC for the release job, and for the deploy jobs when the environment has no AWS_ROLE_ARN variable
         required: true
 
 env:
@@ -122,7 +122,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.RELEASE_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-session-name: release-${{ github.run_id }}
           aws-region: ${{ inputs.aws-region }}
       - name: Install cdflow2
