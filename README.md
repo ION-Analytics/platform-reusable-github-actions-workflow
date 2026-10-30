@@ -46,7 +46,7 @@ jobs:
 
 ### Plan only
 
-Set `plan-only: true` to see what each deploy would change without applying it. Every env runs `cdflow2 deploy --plan-only`, in the same order as a normal run. Approval rules on the GitHub environments still apply.
+Set `plan-only: true` to see what each deploy would change without applying it. Every env runs `cdflow2 deploy <env> <version> --plan-only`, in the same order as a normal run. Approval rules on the GitHub environments still apply.
 
 ```yaml
 jobs:
@@ -69,7 +69,7 @@ The release job still runs, because `cdflow2 deploy` needs a release version.
 | `release-role` | yes | | IAM role ARN assumed via OIDC for the `release` job. |
 | `aws-region` | no | `eu-west-1` | Default AWS region; overridden per env by the `AWS_REGION` variable. |
 | `run-tests` | no | `false` | Run `./test.sh` before releasing. |
-| `plan-only` | no | `false` | Run `cdflow2 deploy --plan-only` in every env: shows the plan without applying it. The release still runs, since deploy needs a release version. |
+| `plan-only` | no | `false` | Run `cdflow2 deploy <env> <version> --plan-only` in every env: shows the plan without applying it. The release still runs, since deploy needs a release version. |
 
 ### Secrets
 
@@ -86,7 +86,7 @@ Each name in `env-groups` is both a GitHub environment and the cdflow2 env name.
 |---|---|---|
 | `AWS_ROLE_ARN` | yes | IAM role assumed via OIDC for the deploy. |
 | `AWS_REGION` | no | Overrides the `aws-region` input. |
-| `CDFLOW2_DEPLOY_ARGS` | no | Extra arguments appended to `cdflow2 deploy`, e.g. `--config-param region=eu-west-2`. Split on whitespace, so values containing spaces are not supported. |
+| `CDFLOW2_DEPLOY_ARGS` | no | Extra global flags placed before `deploy` in the cdflow2 command, e.g. `--config-param region=eu-west-2`. Split on whitespace, so values containing spaces are not supported. |
 
 Example:
 
@@ -105,6 +105,6 @@ Each IAM role needs a trust policy for the GitHub OIDC provider (`token.actions.
 
 ### Notes and limitations
 
-- `release` and all deploy jobs run on the self-hosted runner (`aws`, `linux`, `self-hosted`). `prepare` and `tests` run on `ubuntu-latest`.
+- All jobs run on the self-hosted runner (`aws`, `linux`, `self-hosted`). The runner needs `jq` for the `prepare` job.
 - A stage waits for the whole previous stage. If one group fails at stage 1, later stages are skipped for every group. For fully independent chains, call the workflow once per group.
 - The limit of 4 envs per group comes from four fixed `deploy-stageN` jobs, since GitHub Actions cannot generate jobs dynamically. Add another copy of the job to raise it.
