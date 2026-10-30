@@ -136,8 +136,6 @@ jobs:
     needs: [prepare, release]
     if: ${{ !cancelled() && needs.release.result == 'success' && needs.prepare.outputs.stage1 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
-    environment:
-      name: ${{ matrix.target.env }}
     strategy:
       fail-fast: false
       matrix:
@@ -164,8 +162,6 @@ jobs:
     needs: [prepare, deploy-stage1]
     if: ${{ !cancelled() && needs.deploy-stage1.result == 'success' && needs.prepare.outputs.stage2 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
-    environment:
-      name: ${{ matrix.target.env }}
     strategy:
       fail-fast: false
       matrix:
@@ -192,8 +188,6 @@ jobs:
     needs: [prepare, deploy-stage2]
     if: ${{ !cancelled() && needs.deploy-stage2.result == 'success' && needs.prepare.outputs.stage3 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
-    environment:
-      name: ${{ matrix.target.env }}
     strategy:
       fail-fast: false
       matrix:
@@ -220,8 +214,6 @@ jobs:
     needs: [prepare, deploy-stage3]
     if: ${{ !cancelled() && needs.deploy-stage3.result == 'success' && needs.prepare.outputs.stage4 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
-    environment:
-      name: ${{ matrix.target.env }}
     strategy:
       fail-fast: false
       matrix:
