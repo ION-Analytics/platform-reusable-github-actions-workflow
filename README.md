@@ -44,6 +44,23 @@ jobs:
       DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
 ```
 
+### Plan only
+
+Set `plan-only: true` to see what each deploy would change without applying it. Every env runs `cdflow2 deploy --plan-only`, in the same order as a normal run. Approval rules on the GitHub environments still apply.
+
+```yaml
+jobs:
+  plan:
+    uses: ION-Analytics/platform-reusable-github-actions-workflow/.github/workflows/aws-cdflow2-deploy.yaml@main
+    with:
+      release-role: arn:aws:iam::111111111111:role/github-release
+      env-groups: '[["aslive","live"]]'
+      plan-only: true
+    secrets: inherit
+```
+
+The release job still runs, because `cdflow2 deploy` needs a release version.
+
 ### Inputs
 
 | Input | Required | Default | Description |
