@@ -52,6 +52,7 @@ jobs:
 | `release-role` | yes | | IAM role ARN assumed via OIDC for the `release` job. |
 | `aws-region` | no | `eu-west-1` | Default AWS region; overridden per env by the `AWS_REGION` variable. |
 | `run-tests` | no | `false` | Run `./test.sh` before releasing. |
+| `plan-only` | no | `false` | Run `cdflow2 deploy --plan-only` in every env: shows the plan without applying it. The release still runs, since deploy needs a release version. |
 
 ### Secrets
 

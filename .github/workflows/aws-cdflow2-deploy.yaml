@@ -19,6 +19,11 @@ on:
         required: false
         default: false
         type: boolean
+      plan-only:
+        description: Run `cdflow2 deploy --plan-only` (show the plan without applying) in every env
+        required: false
+        default: false
+        type: boolean
       aws-region:
         description: Default region, used when the environment has no AWS_REGION variable
         required: false
@@ -130,8 +135,9 @@ jobs:
       - name: Deploy to ${{ matrix.target.env }}
         env:
           CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
-        # args are intentionally unquoted so they split into separate flags
-        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+          PLAN_ONLY_FLAG: ${{ inputs.plan-only && '--plan-only' || '' }}
+        # flags are intentionally unquoted so they split into separate arguments
+        run: cdflow2 deploy $PLAN_ONLY_FLAG ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
 
   deploy-stage2:
     needs: [prepare, deploy-stage1]
@@ -157,8 +163,9 @@ jobs:
       - name: Deploy to ${{ matrix.target.env }}
         env:
           CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
-        # args are intentionally unquoted so they split into separate flags
-        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+          PLAN_ONLY_FLAG: ${{ inputs.plan-only && '--plan-only' || '' }}
+        # flags are intentionally unquoted so they split into separate arguments
+        run: cdflow2 deploy $PLAN_ONLY_FLAG ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
 
   deploy-stage3:
     needs: [prepare, deploy-stage2]
@@ -184,8 +191,9 @@ jobs:
       - name: Deploy to ${{ matrix.target.env }}
         env:
           CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
-        # args are intentionally unquoted so they split into separate flags
-        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+          PLAN_ONLY_FLAG: ${{ inputs.plan-only && '--plan-only' || '' }}
+        # flags are intentionally unquoted so they split into separate arguments
+        run: cdflow2 deploy $PLAN_ONLY_FLAG ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
 
   deploy-stage4:
     needs: [prepare, deploy-stage3]
@@ -211,5 +219,6 @@ jobs:
       - name: Deploy to ${{ matrix.target.env }}
         env:
           CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
-        # args are intentionally unquoted so they split into separate flags
-        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+          PLAN_ONLY_FLAG: ${{ inputs.plan-only && '--plan-only' || '' }}
+        # flags are intentionally unquoted so they split into separate arguments
+        run: cdflow2 deploy $PLAN_ONLY_FLAG ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
