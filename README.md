@@ -37,11 +37,11 @@ jobs:
   deploy:
     uses: ION-Analytics/platform-reusable-github-actions-workflow/.github/workflows/aws-cdflow2-deploy.yaml@main
     with:
-      release-role: arn:aws:iam::111111111111:role/github-release
       env-groups: '[["aslive","live"],["aslive_eu-west-2","live_eu-west-2"]]'
     secrets:
       DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
       DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
+      RELEASE_ROLE_ARN: ${{ secrets.RELEASE_ROLE_ARN }}
 ```
 
 ### Plan only
@@ -53,7 +53,6 @@ jobs:
   plan:
     uses: ION-Analytics/platform-reusable-github-actions-workflow/.github/workflows/aws-cdflow2-deploy.yaml@main
     with:
-      release-role: arn:aws:iam::111111111111:role/github-release
       env-groups: '[["aslive","live"]]'
       plan-only: true
     secrets: inherit
@@ -66,7 +65,6 @@ The release job still runs, because `cdflow2 deploy` needs a release version.
 | Input | Required | Default | Description |
 |---|---|---|---|
 | `env-groups` | yes | | JSON array of arrays of env names, e.g. `[["aslive","live"]]`. Max 4 envs per group. |
-| `release-role` | yes | | IAM role ARN assumed via OIDC for the `release` job. |
 | `aws-region` | no | `eu-west-1` | Default AWS region; overridden per env by the `AWS_REGION` variable. |
 | `run-tests` | no | `false` | Run `./test.sh` before releasing. |
 | `plan-only` | no | `false` | Run `cdflow2 deploy <env> <version> --plan-only` in every env: shows the plan without applying it. The release still runs, since deploy needs a release version. |
@@ -77,6 +75,7 @@ The release job still runs, because `cdflow2 deploy` needs a release version.
 |---|---|
 | `DATADOG_API_KEY` | yes |
 | `DATADOG_APP_KEY` | yes |
+| `RELEASE_ROLE_ARN` | yes |
 
 ### Environment configuration
 

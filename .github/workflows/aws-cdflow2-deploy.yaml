@@ -29,10 +29,6 @@ on:
         required: false
         default: eu-west-1
         type: string
-      release-role:
-        description: IAM role ARN assumed via OIDC for the release job
-        required: true
-        type: string
       env-groups:
         description: JSON array of arrays of env names (see the example at the top of this file)
         required: true
@@ -41,6 +37,9 @@ on:
       DATADOG_API_KEY:
         required: true
       DATADOG_APP_KEY:
+        required: true
+      RELEASE_ROLE_ARN:
+        description: IAM role ARN assumed via OIDC for the release job
         required: true
 
 env:
@@ -118,7 +117,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ inputs.release-role }}
+          role-to-assume: ${{ secrets.RELEASE_ROLE_ARN }}
           role-session-name: release-${{ github.run_id }}
           aws-region: ${{ inputs.aws-region }}
       - name: Install cdflow2
