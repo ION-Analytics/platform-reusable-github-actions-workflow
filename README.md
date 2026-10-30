@@ -6,6 +6,7 @@ Reusable GitHub Actions workflows for releasing and deploying with [cdflow2](htt
 |---|---|
 | `.github/workflows/deploy.yaml` | Release and deploy to `aslive` then `live`, using static AWS access keys. |
 | `.github/workflows/aws-cdflow2-deploy.yaml` | Release and deploy to any chained groups of environments, using AWS OIDC. |
+| `actions/cdflow2-deploy` | Composite action: release and deploy a single env inside the caller's job, using credentials the caller configured earlier in that job. |
 
 ## aws-cdflow2-deploy
 
@@ -111,3 +112,37 @@ The workflow only runs when called from the default branch of the calling reposi
 - All jobs run on the self-hosted runner (`aws`, `linux`, `self-hosted`). The runner needs `jq` for the `prepare` job.
 - A stage waits for the whole previous stage. If one group fails at stage 1, later stages are skipped for every group. For fully independent chains, call the workflow once per group.
 - The limit of 4 envs per group comes from four fixed `deploy-stageN` jobs, since GitHub Actions cannot generate jobs dynamically. Add another copy of the job to raise it.
+
+## actions/cdflow2-deploy (composite action)
+
+Runs inside the caller's job, so credentials configured by an earlier step (OIDC, role assumption, etc.) are picked up from the job environment automatically. The caller owns `runs-on`, `permissions` and checkout.
+
+```yaml
+jobs:
+  deploy:
+    runs-on: [aws, linux, self-hosted]
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+      - uses: ION-Analytics/platform-reusable-github-actions-workflow/actions/cdflow2-deploy@main
+        with:
+          env: live
+          datadog-api-key: ${{ secrets.DATADOG_API_KEY }}
+          datadog-app-key: ${{ secrets.DATADOG_APP_KEY }}
+```
+
+| Input | Required | Default | Description |
+|---|---|---|---|
+| `env` | yes | | cdflow2 env to deploy to. |
+| `datadog-api-key` | yes | | Datadog API key. |
+| `datadog-app-key` | yes | | Datadog application key. |
+| `run-tests` | no | `false` | Run `./test.sh` before releasing. |
+| `plan-only` | no | `false` | Pass `--plan-only` to deploy (release still runs). |
+| `deploy-args` | no | | Extra global flags placed before `deploy`. |
+| `enforce-default-branch` | no | `true` | Fail unless on the calling repo's default branch. This is a guard inside the caller's job, so a caller can disable it; do not rely on it as a security boundary. |

@@ -1,0 +1,87 @@
+name: cdflow2-deploy
+description: >
+  Release and deploy a single cdflow2 env. AWS credentials are NOT configured here: run
+  aws-actions/configure-aws-credentials (or any other method) earlier in the same job, so
+  the AWS_* env vars are available to these steps. The caller must check out the repo first.
+
+inputs:
+  env:
+    description: cdflow2 env to deploy to
+    required: true
+  datadog-api-key:
+    description: Datadog API key
+    required: true
+  datadog-app-key:
+    description: Datadog application key
+    required: true
+  run-tests:
+    description: Run ./test.sh before releasing
+    required: false
+    default: 'false'
+  plan-only:
+    description: Run `cdflow2 deploy <env> <version> --plan-only` (show the plan without applying)
+    required: false
+    default: 'false'
+  deploy-args:
+    description: 'Extra global flags placed before `deploy` in the cdflow2 command, e.g. "--config-param region=eu-west-2"'
+    required: false
+    default: ''
+  enforce-default-branch:
+    description: Fail unless running on the default branch of the calling repository
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Require the repository default branch
+      if: ${{ inputs.enforce-default-branch == 'true' }}
+      shell: bash
+      env:
+        REF: ${{ github.ref }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        if [ "$REF" != "refs/heads/$DEFAULT_BRANCH" ]; then
+          echo "::error::This action can only run from the default branch ($DEFAULT_BRANCH), got $REF"
+          exit 1
+        fi
+
+    - name: Validate env name
+      shell: bash
+      env:
+        DEPLOY_ENV: ${{ inputs.env }}
+      run: |
+        if ! [[ "$DEPLOY_ENV" =~ ^[A-Za-z0-9_-]+$ ]]; then
+          echo "::error::'env' must match ^[A-Za-z0-9_-]+$; got: $DEPLOY_ENV"
+          exit 1
+        fi
+
+    - name: Install cdflow2
+      uses: mergermarket/shared-actions/install-cdflow2@main
+
+    - name: Run tests
+      if: ${{ inputs.run-tests == 'true' }}
+      shell: bash
+      run: ./test.sh
+
+    - name: Release
+      shell: bash
+      env:
+        JOB_NAME: ${{ github.workflow }}
+        VERSION: ${{ github.run_number }}-${{ github.sha }}
+        DATADOG_API_KEY: ${{ inputs.datadog-api-key }}
+        DATADOG_APP_KEY: ${{ inputs.datadog-app-key }}
+      run: cdflow2 release $VERSION
+
+    - name: Deploy to ${{ inputs.env }}
+      shell: bash
+      env:
+        JOB_NAME: ${{ github.workflow }}
+        VERSION: ${{ github.run_number }}-${{ github.sha }}
+        DATADOG_API_KEY: ${{ inputs.datadog-api-key }}
+        DATADOG_APP_KEY: ${{ inputs.datadog-app-key }}
+        CDFLOW2_DEPLOY_ARGS: ${{ inputs.deploy-args }}
+        DEPLOY_ENV: ${{ inputs.env }}
+        PLAN_ONLY_FLAG: ${{ inputs.plan-only == 'true' && '--plan-only' || '' }}
+      # flags are intentionally unquoted so they split into separate arguments
+      run: cdflow2 $CDFLOW2_DEPLOY_ARGS deploy $DEPLOY_ENV $VERSION $PLAN_ONLY_FLAG
