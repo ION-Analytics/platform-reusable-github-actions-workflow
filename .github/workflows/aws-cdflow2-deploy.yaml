@@ -1,0 +1,215 @@
+name: aws-cdflow2-deploy
+
+# Example `env-groups` input. Each inner array is a chain: every env waits for the
+# previous env of the same position (stage) to succeed. Maximum of 4 envs per group.
+#
+#   [["aslive", "live"], ["aslive_eu-west-2", "live_eu-west-2"]]
+#
+# Each name is both the GitHub environment and the cdflow2 env. Configure these
+# variables on every GitHub environment:
+#   AWS_ROLE_ARN  (required) IAM role assumed via OIDC
+#   AWS_REGION    (optional) overrides the `aws-region` input
+#   CDFLOW2_DEPLOY_ARGS (optional) extra args appended to `cdflow2 deploy`,
+#                 e.g. "--config-param region=eu-west-2"
+
+on:
+  workflow_call:
+    inputs:
+      run-tests:
+        required: false
+        default: false
+        type: boolean
+      aws-region:
+        description: Default region, used when the environment has no AWS_REGION variable
+        required: false
+        default: eu-west-1
+        type: string
+      release-role:
+        description: IAM role ARN assumed via OIDC for the release job
+        required: true
+        type: string
+      env-groups:
+        description: JSON array of arrays of env names (see the example at the top of this file)
+        required: true
+        type: string
+    secrets:
+      DATADOG_API_KEY:
+        required: true
+      DATADOG_APP_KEY:
+        required: true
+
+env:
+  JOB_NAME: ${{ github.workflow }}
+  VERSION: ${{ github.run_number }}-${{ github.sha }}
+  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+  DATADOG_APP_KEY: ${{ secrets.DATADOG_APP_KEY }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      stage1: ${{ steps.stages.outputs.stage1 }}
+      stage2: ${{ steps.stages.outputs.stage2 }}
+      stage3: ${{ steps.stages.outputs.stage3 }}
+      stage4: ${{ steps.stages.outputs.stage4 }}
+    steps:
+      - name: Split env-groups into stages
+        id: stages
+        env:
+          ENV_GROUPS_JSON: ${{ inputs.env-groups }}
+        run: |
+          set -euo pipefail
+          echo "$ENV_GROUPS_JSON" | jq -e '
+            type == "array" and length > 0 and
+            all(.[]; type == "array" and length >= 1 and length <= 4 and all(.[]; type == "string"))
+          ' > /dev/null || { echo "::error::'env-groups' must be a non-empty array of arrays (max 4) of env names"; exit 1; }
+
+          for i in 1 2 3 4; do
+            stage=$(echo "$ENV_GROUPS_JSON" | jq -c --argjson i "$((i - 1))" '
+              [ .[] | .[$i] // empty | { env: . } ]')
+            echo "stage$i=$stage" >> "$GITHUB_OUTPUT"
+            echo "stage$i: $stage"
+          done
+
+  tests:
+    runs-on: ubuntu-latest
+    if: ${{ inputs.run-tests == true }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Run tests
+        run: ./test.sh
+
+  release:
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    needs: [prepare, tests]
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.tests.result == 'success' || needs.tests.result == 'skipped') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.release-role }}
+          role-session-name: release-${{ github.run_id }}
+          aws-region: ${{ inputs.aws-region }}
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Release
+        run: cdflow2 release $VERSION
+
+  # The four stage jobs are identical apart from `needs` and the matrix source.
+  # GitHub Actions cannot generate jobs dynamically, so they are repeated.
+  deploy-stage1:
+    needs: [prepare, release]
+    if: ${{ needs.prepare.outputs.stage1 != '[]' }}
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    environment:
+      name: ${{ matrix.target.env }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.prepare.outputs.stage1) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: deploy-${{ matrix.target.env }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || inputs.aws-region }}
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Deploy to ${{ matrix.target.env }}
+        env:
+          CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
+        # args are intentionally unquoted so they split into separate flags
+        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+
+  deploy-stage2:
+    needs: [prepare, deploy-stage1]
+    if: ${{ needs.prepare.outputs.stage2 != '[]' }}
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    environment:
+      name: ${{ matrix.target.env }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.prepare.outputs.stage2) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: deploy-${{ matrix.target.env }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || inputs.aws-region }}
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Deploy to ${{ matrix.target.env }}
+        env:
+          CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
+        # args are intentionally unquoted so they split into separate flags
+        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+
+  deploy-stage3:
+    needs: [prepare, deploy-stage2]
+    if: ${{ needs.prepare.outputs.stage3 != '[]' }}
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    environment:
+      name: ${{ matrix.target.env }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.prepare.outputs.stage3) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: deploy-${{ matrix.target.env }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || inputs.aws-region }}
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Deploy to ${{ matrix.target.env }}
+        env:
+          CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
+        # args are intentionally unquoted so they split into separate flags
+        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
+
+  deploy-stage4:
+    needs: [prepare, deploy-stage3]
+    if: ${{ needs.prepare.outputs.stage4 != '[]' }}
+    runs-on: ['aws', 'linux', 'self-hosted' ]
+    environment:
+      name: ${{ matrix.target.env }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.prepare.outputs.stage4) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          role-session-name: deploy-${{ matrix.target.env }}-${{ github.run_id }}
+          aws-region: ${{ vars.AWS_REGION || inputs.aws-region }}
+      - name: Install cdflow2
+        uses: mergermarket/shared-actions/install-cdflow2@main
+      - name: Deploy to ${{ matrix.target.env }}
+        env:
+          CDFLOW2_DEPLOY_ARGS: ${{ vars.CDFLOW2_DEPLOY_ARGS }}
+        # args are intentionally unquoted so they split into separate flags
+        run: cdflow2 deploy ${{ matrix.target.env }} $VERSION $CDFLOW2_DEPLOY_ARGS
