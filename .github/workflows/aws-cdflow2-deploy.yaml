@@ -30,7 +30,7 @@ on:
         default: eu-west-1
         type: string
       env-groups:
-        description: JSON array of arrays of env names (see the example at the top of this file)
+        description: 'JSON array of arrays of env names, e.g. [["env1","env2"],["env3","env4"]] (see the top of this file)'
         required: true
         type: string
     secrets:
@@ -83,10 +83,15 @@ jobs:
           ENV_GROUPS_JSON: ${{ inputs.env-groups }}
         run: |
           set -euo pipefail
+          echo "env-groups: $ENV_GROUPS_JSON"
           echo "$ENV_GROUPS_JSON" | jq -e '
             type == "array" and length > 0 and
-            all(.[]; type == "array" and length >= 1 and length <= 4 and all(.[]; type == "string"))
-          ' > /dev/null || { echo "::error::'env-groups' must be a non-empty array of arrays (max 4) of env names"; exit 1; }
+            all(.[]; type == "array" and length >= 1 and length <= 4 and
+              all(.[]; type == "string" and test("^[A-Za-z0-9_-]+$")))
+          ' > /dev/null || {
+            echo "::error::'env-groups' must be a JSON array of arrays (max 4 per group) of env names, e.g. [[\"env1\",\"env2\"],[\"env3\",\"env4\"]]; got: $ENV_GROUPS_JSON"
+            exit 1
+          }
 
           for i in 1 2 3 4; do
             stage=$(echo "$ENV_GROUPS_JSON" | jq -c --argjson i "$((i - 1))" '
@@ -129,7 +134,7 @@ jobs:
   # GitHub Actions cannot generate jobs dynamically, so they are repeated.
   deploy-stage1:
     needs: [prepare, release]
-    if: ${{ needs.prepare.outputs.stage1 != '[]' }}
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.prepare.outputs.stage1 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
     environment:
       name: ${{ matrix.target.env }}
@@ -157,7 +162,7 @@ jobs:
 
   deploy-stage2:
     needs: [prepare, deploy-stage1]
-    if: ${{ needs.prepare.outputs.stage2 != '[]' }}
+    if: ${{ !cancelled() && needs.deploy-stage1.result == 'success' && needs.prepare.outputs.stage2 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
     environment:
       name: ${{ matrix.target.env }}
@@ -185,7 +190,7 @@ jobs:
 
   deploy-stage3:
     needs: [prepare, deploy-stage2]
-    if: ${{ needs.prepare.outputs.stage3 != '[]' }}
+    if: ${{ !cancelled() && needs.deploy-stage2.result == 'success' && needs.prepare.outputs.stage3 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
     environment:
       name: ${{ matrix.target.env }}
@@ -213,7 +218,7 @@ jobs:
 
   deploy-stage4:
     needs: [prepare, deploy-stage3]
-    if: ${{ needs.prepare.outputs.stage4 != '[]' }}
+    if: ${{ !cancelled() && needs.deploy-stage3.result == 'success' && needs.prepare.outputs.stage4 != '[]' }}
     runs-on: ['aws', 'linux', 'self-hosted' ]
     environment:
       name: ${{ matrix.target.env }}
