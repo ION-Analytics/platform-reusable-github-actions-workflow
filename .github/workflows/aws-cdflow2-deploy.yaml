@@ -31,7 +31,8 @@ on:
         type: string
       env-groups:
         description: 'JSON array of arrays of env names, e.g. [["env1","env2"],["env3","env4"]] (see the top of this file)'
-        required: true
+        default: [["aslive","live"]]
+        required: false
         type: string
     secrets:
       DATADOG_API_KEY:
